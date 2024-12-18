@@ -125,6 +125,27 @@ class GameWithAI(Game):
     # 風牌かどうかを判定
     def is_wind_tile(self, tile):
         return tile.suit in ['東', '南', '西', '北']
+    
+    # ゲーム終了条件のチェック
+    def check_game_end(self, player_index):
+        player = self.players[player_index]
+        # ゲーム終了条件: 4面子1雀頭の形
+        if player.is_valid_hand():
+            print(f"プレイヤー {player_index} の手牌は4面子1雀頭の形です。")
+            print(f"プレイヤー {player_index} の最終手牌: {player}")
+            print("ゲーム終了")
+            return True
+        return False
+    
+    # 四風連打のチェック
+    def check_four_wind_discards(self):
+        if len(self.discards[0]) == 1:
+            first_discard = self.discards[0][0]
+            if all(self.is_wind_tile(self.discards[i][0]) and self.discards[i][0].suit == first_discard.suit for i in range(4)):
+                print("四風連打が発生しました。ゲーム終了")
+                return True
+        return False
+
 
     # ターンのプレイ
     def play_turn(self, player_index):
@@ -132,21 +153,14 @@ class GameWithAI(Game):
         try:
             drawn_tile = self.draw_tile(player)
             print(f"プレイヤー {player_index} がツモった牌 {drawn_tile}")
-            # ゲーム終了条件: 4面子1雀頭の形
-            if player.is_valid_hand():
-                print(f"プレイヤー {player_index} の手牌は4面子1雀頭の形です。")
-                print(f"プレイヤー {player_index} の最終手牌: {player}")
-                print("ゲーム終了")
-                return True 
+            # あがったらゲーム終了
+            if self.check_game_end(player_index):
+                return True
             discard = player.choose_discard()
             print(f"プレイヤー {player_index} が捨てる牌 {discard}")
             print(f"プレイヤー {player_index} の手牌: {player}")
-            # 四風連打のチェック
-            if len(self.discards[0]) == 1:
-                first_discard = self.discards[0][0]
-                if all(self.is_wind_tile(self.discards[i][0]) and self.discards[i][0].suit == first_discard.suit for i in range(4)):
-                    print("四風連打が発生しました。ゲーム終了")
-                    return True
+            if self.check_four_wind_discards():
+                return True
         except ValueError as e:
             print(f"プレイヤー {player_index} がツモれません: {e}")
 
