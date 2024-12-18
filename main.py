@@ -106,6 +106,10 @@ class GameWithAI(Game):
     def __init__(self):
         super().__init__()
         self.players = [AIPlayer() for _ in range(4)]
+        self.discards = [[] for _ in range(4)] 
+
+    def is_wind_tile(self, tile):
+        return tile.suit in ['東', '南', '西', '北']
 
     def play_turn(self, player_index):
         player = self.players[player_index]
@@ -121,6 +125,12 @@ class GameWithAI(Game):
             discard = player.choose_discard()
             print(f"プレイヤー {player_index} が捨てる牌 {discard}")
             print(f"プレイヤー {player_index} の手牌: {player}")
+            # 四風連打のチェック
+            if len(self.discards[0]) == 1:
+                first_discard = self.discards[0][0]
+                if all(self.is_wind_tile(self.discards[i][0]) and self.discards[i][0].suit == first_discard.suit for i in range(4)):
+                    print("四風連打が発生しました。ゲーム終了")
+                    return True
         except ValueError as e:
             print(f"プレイヤー {player_index} がツモれません: {e}")
 
