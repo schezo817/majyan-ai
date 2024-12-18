@@ -1,4 +1,5 @@
 import numpy as np
+from collections import Counter
 
 # 牌の定義
 class Tile:
@@ -13,6 +14,7 @@ class Tile:
 class Hand:
     def __init__(self):
         self.tiles = [] # 手牌
+        self.role = Role()
 
     # 手牌に牌を追加
     def add_tile(self, tile):
@@ -22,6 +24,28 @@ class Hand:
     def remove_tile(self, tile):
         self.tiles.remove(tile)
 
+    # 手牌が4面子1雀頭の形を成しているかどうかを判定
+    def is_valid_hand(self):
+        # 手牌の牌の種類と枚数を数える
+        tile_counts = Counter((tile.suit, tile.rank) for tile in self.tiles)
+        pairs = [tile for tile, count in tile_counts.items() if count >= 2]
+
+        for pair in pairs:
+            remaining_tiles = []
+            for tile in self.tiles:
+                if (tile.suit, tile.rank) == pair and tile_counts[pair] > 0:
+                    tile_counts[pair] -= 1
+                else:
+                    remaining_tiles.append(tile)
+            if self.role.can_form_melds(remaining_tiles):
+                return True
+        return False
+
+    def __repr__(self):
+        return f"Hand({self.tiles})"
+    
+#　役の定義
+class Role:
     # 面子の判定
     def is_sequence(self,tiles):
         return len(tiles) == 3 and tiles[0].rank + 1 == tiles[1].rank and tiles[1].rank + 1 == tiles[2].rank
@@ -44,27 +68,31 @@ class Hand:
                     return True
             return False
 
-    # 手牌が4面子1雀頭の形を成しているかどうかを判定
-    def is_valid_hand(self):
-        from collections import Counter
-
-        # 手牌の牌の種類と枚数を数える
-        tile_counts = Counter((tile.suit, tile.rank) for tile in self.tiles)
-        pairs = [tile for tile, count in tile_counts.items() if count >= 2]
-
-        for pair in pairs:
-            remaining_tiles = []
-            for tile in self.tiles:
-                if (tile.suit, tile.rank) == pair and tile_counts[pair] > 0:
-                    tile_counts[pair] -= 1
-                else:
-                    remaining_tiles.append(tile)
-            if self.can_form_melds(remaining_tiles):
-                return True
-        return False
-
-    def __repr__(self):
-        return f"Hand({self.tiles})"
+    # 七対子の判定
+    def is_seven_pairs(tiles):
+        if len(tiles) != 14:
+            return False
+        tile_counts = Counter((tile.suit, tile.rank) for tile in tiles)
+        return all(count == 2 for count in tile_counts.values())
+    
+    # 国士無双の判定
+    def is_thirteen_orphans(tiles):
+        if len(tiles) != 14:
+            return False
+        required_tiles = set([
+            ('萬', 1), ('萬', 9),
+            ('筒', 1), ('筒', 9),
+            ('索', 1), ('索', 9),
+            ('東', 1), ('南', 1), ('西', 1), ('北', 1),
+            ('白', 1), ('發', 1), ('中', 1)
+        ])
+        tile_counts = Counter((tile.suit, tile.rank) for tile in tiles)
+        tile_set = set(tile_counts.keys())
+        # 必要な牌がすべて含まれているかをチェック
+        if not required_tiles.issubset(tile_set):
+            return False
+        # 必要な牌が13種類であり、かつもう1枚同じ牌が含まれているかをチェック
+        return len(tile_set) == 13 and any(count == 2 for count in tile_counts.values())
 
 # ゲームの定義 
 class Game:
@@ -132,6 +160,18 @@ class GameWithAI(Game):
         # ゲーム終了条件: 4面子1雀頭の形
         if player.is_valid_hand():
             print(f"プレイヤー {player_index} の手牌は4面子1雀頭の形です。")
+            print(f"プレイヤー {player_index} の最終手牌: {player}")
+            print("ゲーム終了")
+            return True
+        # ゲーム終了条件: 七対子
+        if Role.is_seven_pairs(player.tiles):
+            print(f"プレイヤー {player_index} の手牌は七対子です。")
+            print(f"プレイヤー {player_index} の最終手牌: {player}")
+            print("ゲーム終了")
+            return True
+        # ゲーム終了条件: 国士無双
+        if Role.is_thirteen_orphans(player.tiles):
+            print(f"プレイヤー {player_index} の手牌は国士無双です。")
             print(f"プレイヤー {player_index} の最終手牌: {player}")
             print("ゲーム終了")
             return True
