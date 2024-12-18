@@ -1,47 +1,54 @@
 import numpy as np
 
+# 牌の定義
 class Tile:
-    # 牌の定義
     def __init__(self, suit, rank):
-        self.suit = suit  
-        self.rank = rank 
+        self.suit = suit  # 萬, 筒, 索, 東, 南, 西, 北, 白, 發, 中
+        self.rank = rank  # 1-9 (萬, 筒, 索), 1 (東, 南, 西, 北, 白, 發, 中)
 
     def __repr__(self):
         return f"{self.suit}{self.rank}"
-    
+
+# 手牌の定義    
 class Hand:
-    # 手牌の定義
     def __init__(self):
-        self.tiles = []
+        self.tiles = [] # 手牌
 
+    # 手牌に牌を追加
     def add_tile(self, tile):
-        self.tiles.append(tile)
+        self.tiles.append(tile) 
 
+    # 手牌から牌を削除
     def remove_tile(self, tile):
         self.tiles.remove(tile)
 
+    # 面子の判定
+    def is_sequence(self,tiles):
+        return len(tiles) == 3 and tiles[0].rank + 1 == tiles[1].rank and tiles[1].rank + 1 == tiles[2].rank
+
+    # 刻子の判定
+    def is_triplet(self, tiles):
+        return len(tiles) == 3 and tiles[0].rank == tiles[1].rank == tiles[2].rank
+    
+    # 4面子1雀頭の形を成しているかどうかを再帰的に判定
+    def can_form_melds(self, tiles):
+        if len(tiles) == 0:
+            return True
+        if len(tiles) < 3:
+            return False
+        tiles.sort(key=lambda x: (x.suit, x.rank))
+        for i in range(len(tiles) - 2):
+            if self.is_sequence(tiles[i:i+3]) or self.is_triplet(tiles[i:i+3]):
+                new_tiles = tiles[:i] + tiles[i+3:]
+                if  self.can_form_melds(new_tiles):
+                    return True
+            return False
+
+    # 手牌が4面子1雀頭の形を成しているかどうかを判定
     def is_valid_hand(self):
         from collections import Counter
 
-        def is_sequence(tiles):
-            return len(tiles) == 3 and tiles[0].rank + 1 == tiles[1].rank and tiles[1].rank + 1 == tiles[2].rank
-
-        def is_triplet(tiles):
-            return len(tiles) == 3 and tiles[0].rank == tiles[1].rank == tiles[2].rank
-
-        def can_form_melds(tiles):
-            if len(tiles) == 0:
-                return True
-            if len(tiles) < 3:
-                return False
-            tiles.sort(key=lambda x: (x.suit, x.rank))
-            for i in range(len(tiles) - 2):
-                if is_sequence(tiles[i:i+3]) or is_triplet(tiles[i:i+3]):
-                    new_tiles = tiles[:i] + tiles[i+3:]
-                    if can_form_melds(new_tiles):
-                        return True
-            return False
-
+        # 手牌の牌の種類と枚数を数える
         tile_counts = Counter((tile.suit, tile.rank) for tile in self.tiles)
         pairs = [tile for tile, count in tile_counts.items() if count >= 2]
 
@@ -52,19 +59,21 @@ class Hand:
                     tile_counts[pair] -= 1
                 else:
                     remaining_tiles.append(tile)
-            if can_form_melds(remaining_tiles):
+            if self.can_form_melds(remaining_tiles):
                 return True
         return False
 
     def __repr__(self):
         return f"Hand({self.tiles})"
-    
+
+# ゲームの定義 
 class Game:
     def __init__(self):
         self.players = [Hand() for _ in range(4)]
         self.wall = self.create_wall()
         self.dead_wall = []
 
+    # 牌山の生成
     def create_wall(self):
         suits = ['萬', '筒', '索']
         ranks = list(range(1, 10))
@@ -74,6 +83,7 @@ class Game:
         np.random.shuffle(wall)
         return wall
     
+    # 牌をツモ
     def draw_tile(self, player):
         if len(self.wall) > 0:
             tile = self.wall.pop()
@@ -82,6 +92,7 @@ class Game:
         else:
             raise ValueError("No more tiles in the wall")
 
+    # 牌を配る
     def deal_tiles(self):
         for _ in range(13):
             for player in self.players:
@@ -93,7 +104,9 @@ class Game:
     def __repr__(self):
         return f"Game(players={self.players}, wall={len(self.wall)} tiles left)"
     
+# AIプレイヤーの定義
 class AIPlayer(Hand):
+    # 捨てる牌を選ぶ
     def choose_discard(self):
         # シンプルな戦略: ランダムに1枚捨てる
         return self.tiles.pop(np.random.randint(len(self.tiles)))
@@ -101,16 +114,19 @@ class AIPlayer(Hand):
     def __repr__(self):
         sorted_tiles = sorted(self.tiles, key=lambda x: (x.suit, x.rank))
         return f"AIPlayer({sorted_tiles})"
-    
+
+# AIを使ったゲームの定義    
 class GameWithAI(Game):
     def __init__(self):
         super().__init__()
         self.players = [AIPlayer() for _ in range(4)]
         self.discards = [[] for _ in range(4)] 
 
+    # 風牌かどうかを判定
     def is_wind_tile(self, tile):
         return tile.suit in ['東', '南', '西', '北']
 
+    # ターンのプレイ
     def play_turn(self, player_index):
         player = self.players[player_index]
         try:
@@ -134,6 +150,7 @@ class GameWithAI(Game):
         except ValueError as e:
             print(f"プレイヤー {player_index} がツモれません: {e}")
 
+    # ゲームのプレイ
     def play_game(self):
         self.deal_tiles()
         turn = 0
