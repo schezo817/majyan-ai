@@ -24,23 +24,6 @@ class Hand:
     def remove_tile(self, tile):
         self.tiles.remove(tile)
 
-    # 手牌が4面子1雀頭の形を成しているかどうかを判定
-    def is_valid_hand(self):
-        # 手牌の牌の種類と枚数を数える
-        tile_counts = Counter((tile.suit, tile.rank) for tile in self.tiles)
-        pairs = [tile for tile, count in tile_counts.items() if count >= 2]
-
-        for pair in pairs:
-            remaining_tiles = []
-            for tile in self.tiles:
-                if (tile.suit, tile.rank) == pair and tile_counts[pair] > 0:
-                    tile_counts[pair] -= 1
-                else:
-                    remaining_tiles.append(tile)
-            if self.role.can_form_melds(remaining_tiles):
-                return True
-        return False
-
     def __repr__(self):
         return f"Hand({self.tiles})"
     
@@ -54,7 +37,7 @@ class Role:
     def is_triplet(self, tiles):
         return len(tiles) == 3 and tiles[0].rank == tiles[1].rank == tiles[2].rank
     
-    # 4面子1雀頭の形を成しているかどうかを再帰的に判定
+    # 4面子の形を成しているかどうかを再帰的に判定
     def can_form_melds(self, tiles):
         if len(tiles) == 0:
             return True
@@ -67,16 +50,33 @@ class Role:
                 if  self.can_form_melds(new_tiles):
                     return True
             return False
+        
+    # 手牌が4面子1雀頭の形を成しているかどうかを判定
+    def is_valid_hand(self, tiles):
+        # 手牌の牌の種類と枚数を数える
+        tile_counts = Counter((tile.suit, tile.rank) for tile in tiles)
+        pairs = [tile for tile, count in tile_counts.items() if count >= 2]
+
+        for pair in pairs:
+            remaining_tiles = []
+            for tile in tiles:
+                if (tile.suit, tile.rank) == pair and tile_counts[pair] > 0:
+                    tile_counts[pair] -= 1
+                else:
+                    remaining_tiles.append(tile)
+            if self.can_form_melds(remaining_tiles):
+                return True
+        return False
 
     # 七対子の判定
-    def is_seven_pairs(tiles):
+    def is_seven_pairs(self, tiles):
         if len(tiles) != 14:
             return False
         tile_counts = Counter((tile.suit, tile.rank) for tile in tiles)
         return all(count == 2 for count in tile_counts.values())
     
     # 国士無双の判定
-    def is_thirteen_orphans(tiles):
+    def is_thirteen_orphans(self, tiles):
         if len(tiles) != 14:
             return False
         required_tiles = set([
@@ -134,10 +134,24 @@ class Game:
     
 # AIプレイヤーの定義
 class AIPlayer(Hand):
+    def __init__(self):
+        super().__init__()
+        self.role = Role() 
+
     # 捨てる牌を選ぶ
     def choose_discard(self):
         # シンプルな戦略: ランダムに1枚捨てる
         return self.tiles.pop(np.random.randint(len(self.tiles)))
+    
+    # あがりの判断
+    def check_win(self):
+        if self.role.is_valid_hand(self.tiles):
+            return True
+        if self.role.is_seven_pairs(self.tiles):
+            return True
+        if self.role.is_thirteen_orphans(self.tiles):
+            return True
+        return False
 
     def __repr__(self):
         sorted_tiles = sorted(self.tiles, key=lambda x: (x.suit, x.rank))
@@ -157,25 +171,11 @@ class GameWithAI(Game):
     # ゲーム終了条件のチェック
     def check_game_end(self, player_index):
         player = self.players[player_index]
-        # ゲーム終了条件: 4面子1雀頭の形
-        if player.is_valid_hand():
-            print(f"プレイヤー {player_index} の手牌は4面子1雀頭の形です。")
+        if player.check_win():
+            print(f"プレイヤー {player_index} があがりました。")
             print(f"プレイヤー {player_index} の最終手牌: {player}")
             print("ゲーム終了")
             return True
-        # ゲーム終了条件: 七対子
-        if Role.is_seven_pairs(player.tiles):
-            print(f"プレイヤー {player_index} の手牌は七対子です。")
-            print(f"プレイヤー {player_index} の最終手牌: {player}")
-            print("ゲーム終了")
-            return True
-        # ゲーム終了条件: 国士無双
-        if Role.is_thirteen_orphans(player.tiles):
-            print(f"プレイヤー {player_index} の手牌は国士無双です。")
-            print(f"プレイヤー {player_index} の最終手牌: {player}")
-            print("ゲーム終了")
-            return True
-        return False
     
     # 四風連打のチェック
     def check_four_wind_discards(self):
